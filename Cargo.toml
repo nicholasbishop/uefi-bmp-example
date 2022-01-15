@@ -1,0 +1,10 @@
+[package]
+name = "uefi_bmp"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+tinybmp = "0.3.1"
+uefi = { version = "0.14.0", features = ["exts"] }
+uefi-services = "0.11.0"

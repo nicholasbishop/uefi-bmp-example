@@ -2,37 +2,36 @@
 #![no_std]
 #![feature(abi_efiapi)]
 
+extern crate alloc;
+
+use alloc::vec::Vec;
+use embedded_graphics::pixelcolor::{Rgb888, RgbColor};
+use tinybmp::Bmp;
 use uefi::prelude::*;
+use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
 use uefi::ResultExt;
-use uefi::proto::console::gop::{BltOp, BltPixel, FrameBuffer, GraphicsOutput, PixelFormat};
 
-// Set a larger graphics mode.
-fn set_graphics_mode(gop: &mut GraphicsOutput) {
-    // We know for sure QEMU has a 1024x768 mode.
-    let mode = gop
-        .modes()
-        .map(|mode| mode.expect("Warnings encountered while querying mode"))
-        .find(|mode| {
-            let info = mode.info();
-            info.resolution() == (1024, 768)
-        })
-        .unwrap();
+fn draw_bmp(gop: &mut GraphicsOutput) {
+    let bmp_data = include_bytes!("../image.bmp");
+    let bmp = Bmp::<Rgb888>::from_slice(bmp_data).unwrap();
 
-    gop.set_mode(&mode)
-        .expect_success("Failed to set graphics mode");
-}
+    let width: usize = bmp.as_raw().size().width.try_into().unwrap();
+    let height: usize = bmp.as_raw().size().height.try_into().unwrap();
 
-// Fill the screen with color.
-fn fill_color(gop: &mut GraphicsOutput) {
-    let op = BltOp::VideoFill {
-        // Cornflower blue.
-        color: BltPixel::new(100, 149, 237),
+    let mut buffer = Vec::with_capacity(width * height);
+    for pixel in bmp.pixels() {
+        let color = pixel.1;
+        buffer.push(BltPixel::new(color.r(), color.g(), color.b()));
+    }
+
+    let op = BltOp::BufferToVideo {
+        buffer: &buffer,
+        src: BltRegion::Full,
         dest: (0, 0),
-        dims: (1024, 768),
+        dims: (width, height),
     };
 
-    gop.blt(op)
-        .expect_success("Failed to fill screen with color");
+    gop.blt(op).expect_success("Failed to draw bmp");
 }
 
 #[entry]
@@ -43,8 +42,8 @@ fn main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
 
     let gop = bt.locate_protocol::<GraphicsOutput>().unwrap_success();
     let gop = unsafe { &mut *gop.get() };
-    set_graphics_mode(gop);
-    fill_color(gop);
+
+    draw_bmp(gop);
 
     Status::SUCCESS
 }

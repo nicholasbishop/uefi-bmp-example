@@ -196,6 +196,7 @@ dependencies = [
 name = "uefi_bmp"
 version = "0.0.0"
 dependencies = [
+ "embedded-graphics",
  "tinybmp",
  "uefi",
  "uefi-services",
